@@ -785,6 +785,133 @@ COLUMN_MAP: dict[str, str] = {
     "AE06bc":     "debt_repay_farming_inkind",
     "AE07a":      "debt_repay_other_cash",          # debt repayment: other purposes (cash)
     "AE07bc":     "debt_repay_other_inkind",
+    "AE04A":      "debt_repay_consumption_cash",     # total household consumption debt repaid (generated = AE04_1+2+3, cash)
+    "AE04BC":     "debt_repay_consumption_inkind",
     "AE08":       "bought_house_own_saving",        # bought house with own savings past 12 months (0/1)
     "AE09":       "house_purchase_monthly_avg",     # monthly average spent on house purchase
+
+    # EG generated-total sub-columns (CSV uppercase suffix; map only has sub-variants)
+    "EG52A":      "medical_public_outpatient_cash",       # total public hospital outpatient (EG52_1+EG52_2)
+    "EG52BC":     "medical_public_outpatient_inkind",
+    "EG53A":      "medical_private_outpatient_cash",      # total private hospital outpatient
+    "EG53BC":     "medical_private_outpatient_inkind",
+    "EG58A":      "medical_public_inpatient_cash",        # total public hospital inpatient
+    "EG58BC":     "medical_public_inpatient_inkind",
+    "EG59A":      "medical_private_inpatient_cash",       # total private hospital inpatient
+    "EG59BC":     "medical_private_inpatient_inkind",
+    "EG75A":      "fuel_gasohol_cash",                    # total gasohol (EG7501–EG7504)
+    "EG75BC":     "fuel_gasohol_inkind",
+    "EG78A":      "fuel_diesel_cash",                     # total diesel (EG7801–EG7803)
+    "EG78BC":     "fuel_diesel_inkind",
+    "EG84A":      "telecom_equipment_cash",               # total communication equipment purchase
+    "EG84BC":     "telecom_equipment_inkind",
+    "EG85A":      "telecom_phone_service_cash",           # total telephone service
+    "EG85BC":     "telecom_phone_service_inkind",
+    "EG86A":      "telecom_internet_service_cash",        # total internet service
+    "EG86BC":     "telecom_internet_service_inkind",
+    "EG117A":     "insurance_premiums_cash",              # total insurance premiums (EG117_1+2+3)
+    "EG117BC":    "insurance_premiums_inkind",
+
+    # ── MISSING SUB-COLUMN MAPPINGS ──────────────────────────────────────────
+    # REC13 — Wage income: occupation count
+    "OCC1":       "iw_n_occupations",               # number of wage occupations for this member
+
+    # REC14 — Business income: occupation count and sub-columns
+    "OCC2":       "ib_n_occupations",               # number of business occupations for this member
+    "IB04":       "ib_work_type_code",              # work type indicator (auxiliary code)
+    # IB08: gross receipts — A=past12m, B=last month
+    "IB08A":      "ib_gross_receipts_past12m",
+    "IB08B":      "ib_gross_receipts_last_month",
+    # IB0901–0907: operating costs — A=past12m, B=last month
+    "IB0901A":    "ib_cost_raw_materials_past12m",
+    "IB0901B":    "ib_cost_raw_materials_last_month",
+    "IB0902A":    "ib_cost_rent_past12m",
+    "IB0902B":    "ib_cost_rent_last_month",
+    "IB0903A":    "ib_cost_fuel_electricity_past12m",
+    "IB0903B":    "ib_cost_fuel_electricity_last_month",
+    "IB0904A":    "ib_cost_wages_paid_past12m",
+    "IB0904B":    "ib_cost_wages_paid_last_month",
+    "IB0905A":    "ib_cost_medical_employees_past12m",
+    "IB0905B":    "ib_cost_medical_employees_last_month",
+    "IB0906A":    "ib_cost_interest_insurance_past12m",
+    "IB0906B":    "ib_cost_interest_insurance_last_month",
+    "IB0907A":    "ib_cost_taxes_other_past12m",
+    "IB0907B":    "ib_cost_taxes_other_last_month",
+    # IB09: total operating cost — A=past12m, B=last month
+    "IB09A":      "ib_total_operating_cost_past12m",
+    "IB09B":      "ib_total_operating_cost_last_month",
+
+    # REC15 — Farm income: IA member serials and land area sub-columns
+    "IA02A":      "ia_member1_serial_no",           # serial no of 1st farming member
+    "IA02B":      "ia_member2_serial_no",           # serial no of 2nd farming member
+    "IA03_1A":    "ia_farm_type1_code",             # farm activity type code (1st activity)
+    "IA03_1B":    "ia_farm_type2_code",             # farm activity type code (2nd activity)
+    "IA03_1C":    "ia_farm_type3_code",             # farm activity type code (3rd activity)
+    # IA04–06: land area — A=rai, B=sq wa (tarangwa)
+    "IA04A":      "ia_owned_land_rai",
+    "IA04B":      "ia_owned_land_sqwa",
+    "IA05A":      "ia_rented_land_rai",
+    "IA05B":      "ia_rented_land_sqwa",
+    "IA06A":      "ia_public_land_rai",
+    "IA06B":      "ia_public_land_sqwa",
+
+    # REC16 — Other income: IO sub-columns
+    # IO07X1/X2: socioeconomic sub-class codes (items 6-9)
+    "IO07X1":     "io_socioeconomic_subclass1_69",
+    "IO07X2":     "io_socioeconomic_subclass2_69",
+    # IO02–IO14: A=cash past 12m, B=in-kind past 12m, C=last month cash
+    "IO02A":      "io_pension_cash_past12m",
+    "IO02B":      "io_pension_inkind_past12m",
+    "IO02C":      "io_pension_last_month_cash",
+    "IO03A":      "io_work_compensation_cash_past12m",
+    "IO03B":      "io_work_compensation_inkind_past12m",
+    "IO03C":      "io_work_compensation_last_month_cash",
+    "IO04A":      "io_private_transfer_cash_past12m",
+    "IO04B":      "io_private_transfer_inkind_past12m",
+    "IO04C":      "io_private_transfer_last_month_cash",
+    "IO05A":      "io_govt_social_assist_cash_past12m",
+    "IO05B":      "io_govt_social_assist_inkind_past12m",
+    "IO05C":      "io_govt_social_assist_last_month_cash",
+    "IO05_1A":    "io_elderly_pension_cash_past12m",
+    "IO05_1B":    "io_elderly_pension_inkind_past12m",
+    "IO05_1C":    "io_elderly_pension_last_month_cash",
+    "IO05_2A":    "io_disability_assist_cash_past12m",
+    "IO05_2B":    "io_disability_assist_inkind_past12m",
+    "IO05_2C":    "io_disability_assist_last_month_cash",
+    "IO05_3A":    "io_welfare_card_cash_past12m",
+    "IO05_3B":    "io_welfare_card_inkind_past12m",
+    "IO05_3C":    "io_welfare_card_last_month_cash",
+    "IO05_4A":    "io_child_subsidy_cash_past12m",
+    "IO05_4B":    "io_child_subsidy_inkind_past12m",
+    "IO05_4C":    "io_child_subsidy_last_month_cash",
+    "IO05_5A":    "io_paotang_app_cash_past12m",
+    "IO05_5B":    "io_paotang_app_inkind_past12m",
+    "IO05_5C":    "io_paotang_app_last_month_cash",
+    "IO05_6A":    "io_other_govt_assist_cash_past12m",
+    "IO05_6B":    "io_other_govt_assist_inkind_past12m",
+    "IO05_6C":    "io_other_govt_assist_last_month_cash",
+    "IO06A":      "io_scholarship_cash_past12m",
+    "IO06B":      "io_scholarship_inkind_past12m",
+    "IO06C":      "io_scholarship_last_month_cash",
+    "IO08A":      "io_rental_income_cash_past12m",
+    "IO08B":      "io_rental_income_inkind_past12m",
+    "IO08C":      "io_rental_income_last_month_cash",
+    "IO09A":      "io_copyright_cash_past12m",
+    "IO09B":      "io_copyright_inkind_past12m",
+    "IO09C":      "io_copyright_last_month_cash",
+    "IO10A":      "io_bank_interest_cash_past12m",
+    "IO10B":      "io_bank_interest_inkind_past12m",
+    "IO10C":      "io_bank_interest_last_month_cash",
+    "IO11A":      "io_private_lending_interest_cash_past12m",
+    "IO11B":      "io_private_lending_interest_inkind_past12m",
+    "IO11C":      "io_private_lending_interest_last_month_cash",
+    "IO12A":      "io_gifts_inheritance_cash_past12m",
+    "IO12B":      "io_gifts_inheritance_inkind_past12m",
+    "IO12C":      "io_gifts_inheritance_last_month_cash",
+    "IO13A":      "io_insurance_proceeds_cash_past12m",
+    "IO13B":      "io_insurance_proceeds_inkind_past12m",
+    "IO13C":      "io_insurance_proceeds_last_month_cash",
+    "IO14A":      "io_other_income_cash_past12m",
+    "IO14B":      "io_other_income_inkind_past12m",
+    "IO14C":      "io_other_income_last_month_cash",
 }
