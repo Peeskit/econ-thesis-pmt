@@ -1,2 +1,6 @@
 .DS_Store
 SES 2564 (2021)/
+data/*.db
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
