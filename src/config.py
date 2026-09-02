@@ -10,4 +10,9 @@ SES_CSV_DIR = Path(
     )
 )
 
+# SQLite fallback (kept for reference / lightweight use)
 DB_PATH = Path(os.environ.get("DB_PATH", ROOT / "data" / "ses2564.db"))
+
+# PostgreSQL connection URL
+# Override with env var: export PG_URL="postgresql://user:pass@host:5432/dbname"
+PG_URL = os.environ.get("PG_URL", "postgresql://localhost/ses2564")

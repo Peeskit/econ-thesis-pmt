@@ -1,20 +1,21 @@
 """
-ETL pipeline: reads SES 2564 CSV files → thematic SQLite tables + pmt_dataset view.
+ETL pipeline: reads SES 2564 CSV files → thematic PostgreSQL tables + pmt_dataset view.
 
 Usage:
-    python src/data_loader.py
-    python src/data_loader.py --csv-dir /path/to/csvs --db-path /path/to/out.db
+    python -m src.data_loader
+    python -m src.data_loader --pg-url postgresql://localhost/ses2564
+    python -m src.data_loader --csv-dir /path/to/csvs
 """
 
 import argparse
-import sqlite3
 from pathlib import Path
 
 import pandas as pd
+from sqlalchemy import create_engine, text
 from tqdm import tqdm
 
 from src.column_map import COLUMN_MAP
-from src.config import DB_PATH, SES_CSV_DIR
+from src.config import PG_URL, SES_CSV_DIR
 
 # ── Column sets for thematic splitting of REC01 ──────────────────────────────
 
@@ -30,10 +31,8 @@ _TARGET_READABLE = {
     "monthly_current_income_percapita",
 }
 
-# REC types that feed income_sources
 _INCOME_RECS = {"REC13", "REC14", "REC15", "REC16"}
 
-# REC types that feed expenditure
 _EXPENDITURE_RECS = {"REC04", "REC05", "REC06", "REC07", "REC08", "REC09",
                      "REC10", "REC11", "REC12"}
 
@@ -50,11 +49,6 @@ def _read_csv(path: Path) -> pd.DataFrame:
 
 
 def read_csv_records(csv_dir: Path) -> dict[str, pd.DataFrame]:
-    """
-    Read all SES CSV files from csv_dir, rename columns via COLUMN_MAP,
-    and return a dict keyed by record type (e.g. 'REC01', 'REC18').
-    REC18 part files are concatenated into a single 'REC18' entry.
-    """
     csv_dir = Path(csv_dir)
     csv_files = sorted(csv_dir.glob("*.csv"))
 
@@ -62,13 +56,12 @@ def read_csv_records(csv_dir: Path) -> dict[str, pd.DataFrame]:
     rec18_parts: list[pd.DataFrame] = []
 
     for path in tqdm(csv_files, desc="Reading CSVs", unit="file"):
-        name = path.stem  # e.g. "Microdata SES 2564 REC01"
-        # Extract record key: last token(s) after "REC"
+        name = path.stem
         upper = name.upper()
         idx = upper.rfind("REC")
         if idx == -1:
             continue
-        rec_key = "REC" + upper[idx + 3:].lstrip()  # e.g. "REC01", "REC18PART1"
+        rec_key = "REC" + upper[idx + 3:].lstrip()
 
         df = _read_csv(path)
         df.rename(columns=COLUMN_MAP, inplace=True)
@@ -76,10 +69,9 @@ def read_csv_records(csv_dir: Path) -> dict[str, pd.DataFrame]:
         if "18PART" in rec_key or "18 PART" in rec_key:
             rec18_parts.append(df)
         else:
-            key = rec_key[:5]  # trim to "REC01" etc.
+            key = rec_key[:5]
             recs.setdefault(key, []).append(df)
 
-    # Concatenate REC18 parts (parts cover different sub-sections so columns differ — outer join)
     if rec18_parts:
         recs["REC18"] = [pd.concat(rec18_parts, ignore_index=True, join="outer")]
 
@@ -138,47 +130,27 @@ def build_debt(rec25: pd.DataFrame) -> pd.DataFrame:
 
 # ── Database writing ──────────────────────────────────────────────────────────
 
-_HOUSEHOLD_TABLES = {"target", "household", "housing_assets", "debt"}
-
-_PMT_VIEW_SQL = """
-CREATE VIEW pmt_dataset AS
-SELECT
-    t.household_id,
-    t.region,
-    t.province,
-    t.area_type,
-    t.sampling_weight,
-    t.monthly_income_household,
-    t.monthly_current_income_household,
-    t.monthly_income_percapita,
-    t.monthly_current_income_percapita,
-    h.*,
-    ha.*
-FROM target t
-JOIN household h  USING (household_id)
-JOIN housing_assets ha USING (household_id)
-"""
-
-# Columns duplicated by JOIN that we strip from h.* and ha.*
-# SQLite doesn't support EXCEPT/EXCLUDE in SELECT, so we build explicit lists.
-
-def _pmt_view_sql(con: sqlite3.Connection) -> str:
+def _pmt_view_sql(engine) -> str:
     """Build explicit-column SELECT for pmt_dataset view to avoid duplicates."""
-    def cols(table: str) -> list[str]:
-        cur = con.execute(f"PRAGMA table_info({table})")
-        return [row[1] for row in cur.fetchall()]
+    with engine.connect() as con:
+        def cols(table: str) -> list[str]:
+            result = con.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = :t ORDER BY ordinal_position"
+            ), {"t": table})
+            return [row[0] for row in result]
 
-    shared = {"household_id", "region", "province", "area_type", "sampling_weight"}
-    target_cols = cols("target")
-    household_cols = [c for c in cols("household") if c not in shared]
-    housing_cols = [c for c in cols("housing_assets") if c not in shared]
+        shared = {"household_id", "region", "province", "area_type", "sampling_weight"}
+        target_cols = cols("target")
+        household_cols = [c for c in cols("household") if c not in shared]
+        housing_cols = [c for c in cols("housing_assets") if c not in shared]
 
-    t_sel = ", ".join(f"t.{c}" for c in target_cols)
-    h_sel = ", ".join(f"h.{c}" for c in household_cols)
-    ha_sel = ", ".join(f"ha.{c}" for c in housing_cols)
+    t_sel = ", ".join(f't."{c}"' for c in target_cols)
+    h_sel = ", ".join(f'h."{c}"' for c in household_cols)
+    ha_sel = ", ".join(f'ha."{c}"' for c in housing_cols)
 
     return f"""
-CREATE VIEW pmt_dataset AS
+CREATE OR REPLACE VIEW pmt_dataset AS
 SELECT {t_sel}, {h_sel}, {ha_sel}
 FROM target t
 JOIN household h USING (household_id)
@@ -186,30 +158,28 @@ JOIN housing_assets ha USING (household_id)
 """
 
 
-def write_to_db(tables: dict[str, pd.DataFrame], db_path: Path) -> None:
-    db_path = Path(db_path)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
+def write_to_db(tables: dict[str, pd.DataFrame], pg_url: str) -> None:
+    engine = create_engine(pg_url)
 
-    con = sqlite3.connect(db_path)
-    try:
-        for name, df in tqdm(tables.items(), desc="Writing tables", unit="table"):
-            df.to_sql(name, con, if_exists="replace", index=False)
-            print(f"  {name}: {len(df):,} rows, {len(df.columns)} cols")
+    for name, df in tqdm(tables.items(), desc="Writing tables", unit="table"):
+        # Sanitise column names: strip leading/trailing whitespace
+        df.columns = [c.strip() for c in df.columns]
+        df.to_sql(name, engine, if_exists="replace", index=False, method="multi", chunksize=5000)
+        print(f"  {name}: {len(df):,} rows, {len(df.columns)} cols")
 
-        # Drop and recreate the view
-        con.execute("DROP VIEW IF EXISTS pmt_dataset")
-        con.execute(_pmt_view_sql(con))
+    view_sql = _pmt_view_sql(engine)
+    with engine.connect() as con:
+        con.execute(text(view_sql))
         con.commit()
-        print("  pmt_dataset view created")
-    finally:
-        con.close()
+    print("  pmt_dataset view created")
+    engine.dispose()
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
-def main(csv_dir: Path = SES_CSV_DIR, db_path: Path = DB_PATH) -> None:
+def main(csv_dir: Path = SES_CSV_DIR, pg_url: str = PG_URL) -> None:
     print(f"CSV dir : {csv_dir}")
-    print(f"DB path : {db_path}")
+    print(f"PG URL  : {pg_url}")
 
     recs = read_csv_records(csv_dir)
 
@@ -223,13 +193,13 @@ def main(csv_dir: Path = SES_CSV_DIR, db_path: Path = DB_PATH) -> None:
         "debt":           build_debt(recs["REC25"]),
     }
 
-    write_to_db(tables, db_path)
-    print(f"\nDone. Database written to {db_path}")
+    write_to_db(tables, pg_url)
+    print(f"\nDone. Database loaded into {pg_url}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Load SES 2564 CSVs into SQLite")
+    parser = argparse.ArgumentParser(description="Load SES 2564 CSVs into PostgreSQL")
     parser.add_argument("--csv-dir", type=Path, default=SES_CSV_DIR)
-    parser.add_argument("--db-path", type=Path, default=DB_PATH)
+    parser.add_argument("--pg-url", default=PG_URL)
     args = parser.parse_args()
-    main(args.csv_dir, args.db_path)
+    main(args.csv_dir, args.pg_url)
