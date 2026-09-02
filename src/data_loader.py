@@ -71,13 +71,7 @@ def read_csv_records(csv_dir: Path) -> dict[str, pd.DataFrame]:
         rec_key = "REC" + upper[idx + 3:].lstrip()  # e.g. "REC01", "REC18PART1"
 
         df = _read_csv(path)
-        # Case-insensitive rename: map has EG01a but CSV has EG01A (uppercase suffix)
-        _ci_map = {k.upper(): v for k, v in COLUMN_MAP.items()}
-        df.rename(columns={col: _ci_map.get(col.upper(), col) for col in df.columns}, inplace=True)
-        # Normalise household_id column name (handles mixed-case source header)
-        for alias in ("New_hh_no", "NEW_HH_NO"):
-            if alias in df.columns:
-                df.rename(columns={alias: "household_id"}, inplace=True)
+        df.rename(columns=COLUMN_MAP, inplace=True)
 
         if "18PART" in rec_key or "18 PART" in rec_key:
             rec18_parts.append(df)
